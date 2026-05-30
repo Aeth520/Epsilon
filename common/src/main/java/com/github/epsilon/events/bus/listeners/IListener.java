@@ -29,4 +29,11 @@ public interface IListener {
     @Deprecated
     boolean isStatic();
 
+    /**
+     * @return The owner object of this listener, or null if static or not applicable
+     */
+    default Object getOwner() {
+        return null;
+    }
+
 }

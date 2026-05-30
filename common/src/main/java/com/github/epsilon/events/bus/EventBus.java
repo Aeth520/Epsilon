@@ -1,12 +1,12 @@
 package com.github.epsilon.events.bus;
 
+import com.github.epsilon.Constants;
+import com.github.epsilon.events.Cancellable;
 import com.github.epsilon.events.bus.listeners.IListener;
 import com.github.epsilon.events.bus.listeners.LambdaListener;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -19,6 +19,11 @@ public class EventBus {
     private final Map<Class<?>, List<IListener>> staticListenerCache = new ConcurrentHashMap<>();
 
     private final Map<Class<?>, List<IListener>> listenerMap = new ConcurrentHashMap<>();
+
+    /**
+     * Caches the merged listener list for a given event class including all superclass listeners.
+     */
+    private final Map<Class<?>, List<IListener>> hierarchyCache = new ConcurrentHashMap<>();
 
     private final List<LambdaFactoryInfo> lambdaFactoryInfos = new ArrayList<>();
 
@@ -34,11 +39,15 @@ public class EventBus {
     }
 
     public <T> T post(T event) {
-        List<IListener> listeners = listenerMap.get(event.getClass());
+        List<IListener> listeners = getHierarchyListeners(event.getClass());
 
         if (listeners != null) {
             for (IListener listener : listeners) {
-                listener.call(event);
+                try {
+                    listener.call(event);
+                } catch (Throwable t) {
+                    Constants.LOGGER.error("Error dispatching event {} to listener {}", event.getClass().getSimpleName(), listener.getClass().getSimpleName(), t);
+                }
             }
         }
 
@@ -46,20 +55,52 @@ public class EventBus {
     }
 
     public <T extends Cancellable> T post(T event) {
-        List<IListener> listeners = listenerMap.get(event.getClass());
+        List<IListener> listeners = getHierarchyListeners(event.getClass());
 
         if (listeners != null) {
             event.setCancelled(false);
 
             for (IListener listener : listeners) {
-                listener.call(event);
-                if (event.isCancelled()) {
-                    break;
+                try {
+                    listener.call(event);
+                    if (event.isCancelled()) {
+                        break;
+                    }
+                } catch (Throwable t) {
+                    Constants.LOGGER.error("Error dispatching cancellable event {} to listener {}", event.getClass().getSimpleName(), listener.getClass().getSimpleName(), t);
                 }
             }
         }
 
         return event;
+    }
+
+    /**
+     * Gets listeners for the exact event class, plus listeners for all superclasses in the hierarchy.
+     * Results are cached for performance.
+     */
+    private List<IListener> getHierarchyListeners(Class<?> eventClass) {
+        return hierarchyCache.computeIfAbsent(eventClass, klass -> {
+            List<IListener> merged = new ArrayList<>();
+            Set<IListener> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+
+            Class<?> current = klass;
+            while (current != null && current != Object.class) {
+                List<IListener> classListeners = listenerMap.get(current);
+                if (classListeners != null) {
+                    for (IListener listener : classListeners) {
+                        if (seen.add(listener)) {
+                            merged.add(listener);
+                        }
+                    }
+                }
+                current = current.getSuperclass();
+            }
+
+            // Sort by priority (descending)
+            merged.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
+            return Collections.unmodifiableList(merged);
+        });
     }
 
     public void subscribe(Object object) {
@@ -88,6 +129,8 @@ public class EventBus {
         } else {
             insert(listenerMap.computeIfAbsent(listener.getTarget(), aClass -> new CopyOnWriteArrayList<>()), listener);
         }
+        // Invalidate hierarchy cache when listeners change
+        hierarchyCache.clear();
     }
 
     private void insert(List<IListener> listeners, IListener listener) {
@@ -131,6 +174,38 @@ public class EventBus {
                 l.remove(listener);
             }
         }
+        // Invalidate hierarchy cache when listeners change
+        hierarchyCache.clear();
+    }
+
+    /**
+     * Unsubscribes all listeners owned by the given object.
+     * Iterates all event types and removes listeners whose owner matches (identity comparison).
+     */
+    public void unsubscribeAll(Object object) {
+        if (object == null) return;
+
+        boolean changed = false;
+        for (Map.Entry<Class<?>, List<IListener>> entry : listenerMap.entrySet()) {
+            List<IListener> listeners = entry.getValue();
+            if (listeners != null) {
+                changed |= listeners.removeIf(listener -> listener.getOwner() == object);
+            }
+        }
+
+        if (changed) {
+            hierarchyCache.clear();
+        }
+    }
+
+    /**
+     * Clears all registered listeners and caches.
+     */
+    public void clear() {
+        listenerMap.clear();
+        listenerCache.clear();
+        staticListenerCache.clear();
+        hierarchyCache.clear();
     }
 
     private List<IListener> getListeners(Class<?> klass, Object object) {

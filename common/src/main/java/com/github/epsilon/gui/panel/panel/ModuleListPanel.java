@@ -18,6 +18,7 @@ import com.github.epsilon.gui.panel.utils.*;
 import com.github.epsilon.managers.sound.SoundKey;
 import com.github.epsilon.managers.sound.SoundManager;
 import com.github.epsilon.modules.Module;
+import com.github.epsilon.settings.SettingChangeTracker;
 import com.github.epsilon.utils.render.animation.Animation;
 import com.github.epsilon.utils.render.animation.Easing;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -356,6 +357,7 @@ public class ModuleListPanel {
     private long buildContentSignature(List<Module> modules) {
         long signature = 17L;
         signature = signature * 31L + TranslateHolder.INSTANCE.getRevision();
+        signature = signature * 31L + SettingChangeTracker.INSTANCE.getRevision();
         signature = signature * 31L + state.getSelectedCategory().name().hashCode();
         signature = signature * 31L + state.getSearchQuery().hashCode();
         signature = signature * 31L + (searchFocused ? 1 : 0);

@@ -5,12 +5,9 @@ import com.github.epsilon.addon.EpsilonAddon;
 import com.github.epsilon.assets.config.LegacyConfigMigrator;
 import com.github.epsilon.modules.HudModule;
 import com.github.epsilon.modules.Module;
-import com.github.epsilon.modules.impl.ClientSetting;
 import com.github.epsilon.settings.Setting;
-import com.github.epsilon.settings.impl.*;
 import com.google.gson.*;
 
-import java.awt.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -322,7 +319,19 @@ public class ConfigManager {
         JsonObject settingsObj = getObject(moduleObj, "settings");
         if (settingsObj != null) {
             for (Setting<?> setting : module.getSettings()) {
-                applySetting(setting, settingsObj.get(setting.getName()));
+                JsonElement value = settingsObj.get(setting.getName());
+                // Try aliases if the primary name doesn't match
+                if (value == null) {
+                    for (String alias : setting.getAliases()) {
+                        value = settingsObj.get(alias);
+                        if (value != null) break;
+                    }
+                }
+                if (value != null && value.isJsonPrimitive()) {
+                    setting.setSuppressCallbacks(true);
+                    setting.deserialize(value);
+                    setting.setSuppressCallbacks(false);
+                }
             }
         }
 
@@ -365,7 +374,7 @@ public class ConfigManager {
         JsonObject settingsObj = new JsonObject();
         for (Setting<?> setting : module.getSettings()) {
             if (setting == null) continue;
-            JsonElement value = serializeSetting(setting);
+            JsonElement value = setting.serialize();
             if (value != null) settingsObj.add(setting.getName(), value);
         }
         obj.add("settings", settingsObj);
@@ -400,7 +409,18 @@ public class ConfigManager {
             }
 
             for (Setting<?> setting : addon.getSettings()) {
-                applySetting(setting, settingsObj.get(setting.getName()));
+                JsonElement value = settingsObj.get(setting.getName());
+                if (value == null) {
+                    for (String alias : setting.getAliases()) {
+                        value = settingsObj.get(alias);
+                        if (value != null) break;
+                    }
+                }
+                if (value != null && value.isJsonPrimitive()) {
+                    setting.setSuppressCallbacks(true);
+                    setting.deserialize(value);
+                    setting.setSuppressCallbacks(false);
+                }
             }
         } catch (Exception e) {
             Constants.LOGGER.error("读取 addon 配置失败: {}", file, e);
@@ -433,7 +453,7 @@ public class ConfigManager {
         JsonObject settingsObj = new JsonObject();
         for (Setting<?> setting : addon.getSettings()) {
             if (setting == null) continue;
-            JsonElement value = serializeSetting(setting);
+            JsonElement value = setting.serialize();
             if (value != null) settingsObj.add(setting.getName(), value);
         }
         obj.add("settings", settingsObj);
@@ -475,41 +495,6 @@ public class ConfigManager {
             }
         } catch (Exception e) {
             Constants.LOGGER.error("读取好友文件失败: {}", friendFile, e);
-        }
-    }
-
-    private static JsonElement serializeSetting(Setting<?> setting) {
-        if (setting instanceof KeybindSetting s) return new JsonPrimitive(s.getValue());
-        if (setting instanceof BoolSetting s) return new JsonPrimitive(s.getValue());
-        if (setting instanceof IntSetting s) return new JsonPrimitive(s.getValue());
-        if (setting instanceof DoubleSetting s) return new JsonPrimitive(s.getValue());
-        if (setting instanceof StringSetting s) return new JsonPrimitive(s.getValue());
-        if (setting instanceof EnumSetting s) return new JsonPrimitive(s.getValue().toString());
-        if (setting instanceof ColorSetting s) {
-            Color c = s.getValue();
-            return c == null ? null : new JsonPrimitive(c.getRGB());
-        }
-        return null;
-    }
-
-    private static void applySetting(Setting<?> setting, JsonElement value) {
-        if (value == null || !value.isJsonPrimitive()) return;
-        try {
-            if (setting instanceof BoolSetting s) s.setValue(value.getAsBoolean());
-            else if (setting instanceof KeybindSetting s) s.setValue(value.getAsInt());
-            else if (setting instanceof IntSetting s) s.setValue(value.getAsInt());
-            else if (setting instanceof DoubleSetting s) s.setValue(value.getAsDouble());
-            else if (setting instanceof StringSetting s) s.setValue(value.getAsString());
-            else if (setting == ClientSetting.INSTANCE.guiMode && setting instanceof EnumSetting s)
-                s.setModeSilently(value.getAsString());
-            else if (setting instanceof EnumSetting s) s.setMode(value.getAsString());
-            else if (setting instanceof ColorSetting s) {
-                int argb = value.getAsInt();
-                Color c = new Color(argb, true);
-                if (!s.isAllowAlpha()) c = new Color(c.getRed(), c.getGreen(), c.getBlue());
-                s.setValue(c);
-            }
-        } catch (Exception ignored) {
         }
     }
 

@@ -11,15 +11,21 @@ public class ConsumerListener<T> implements IListener {
     private final Class<T> target;
     private final int priority;
     private final Consumer<T> executor;
+    private final Object owner;
 
-    public ConsumerListener(Class<T> target, int priority, Consumer<T> executor) {
+    public ConsumerListener(Class<T> target, int priority, Consumer<T> executor, Object owner) {
         this.target = target;
         this.priority = priority;
         this.executor = executor;
+        this.owner = owner;
+    }
+
+    public ConsumerListener(Class<T> target, int priority, Consumer<T> executor) {
+        this(target, priority, executor, null);
     }
 
     public ConsumerListener(Class<T> target, Consumer<T> executor) {
-        this(target, EventPriority.MEDIUM, executor);
+        this(target, EventPriority.MEDIUM, executor, null);
     }
 
     @SuppressWarnings("unchecked")
@@ -41,6 +47,11 @@ public class ConsumerListener<T> implements IListener {
     @Override
     public boolean isStatic() {
         return false;
+    }
+
+    @Override
+    public Object getOwner() {
+        return owner;
     }
 
 }

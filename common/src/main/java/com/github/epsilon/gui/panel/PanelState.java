@@ -204,9 +204,17 @@ public class PanelState {
     }
 
     private boolean matchesSearch(Module module, String loweredSearch) {
-        return module.getName().toLowerCase().contains(loweredSearch)
+        if (module.getName().toLowerCase().contains(loweredSearch)
                 || module.getTranslatedName().toLowerCase().contains(loweredSearch)
-                || module.getCategory().getName().toLowerCase().contains(loweredSearch);
+                || module.getCategory().getName().toLowerCase().contains(loweredSearch)) {
+            return true;
+        }
+        for (String alias : module.getAliases()) {
+            if (alias.toLowerCase().contains(loweredSearch)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isClientSettingMode() {

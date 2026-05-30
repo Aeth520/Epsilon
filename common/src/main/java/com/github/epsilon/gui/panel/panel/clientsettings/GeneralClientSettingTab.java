@@ -6,6 +6,7 @@ import com.github.epsilon.graphics.renderers.RoundRectRenderer;
 import com.github.epsilon.graphics.renderers.TextRenderer;
 import com.github.epsilon.gui.panel.PanelLayout;
 import com.github.epsilon.gui.panel.PanelState;
+import com.github.epsilon.settings.SettingChangeTracker;
 import com.github.epsilon.gui.panel.adapter.SettingListController;
 import com.github.epsilon.gui.panel.component.setting.KeybindSettingRow;
 import com.github.epsilon.gui.panel.dsl.PanelUiCompiler;
@@ -276,6 +277,7 @@ public class GeneralClientSettingTab implements ClientSettingTabView {
     private long buildContentSignature(List<Setting<?>> settings) {
         long signature = 17L;
         signature = signature * 31L + TranslateHolder.INSTANCE.getRevision();
+        signature = signature * 31L + SettingChangeTracker.INSTANCE.getRevision();
         signature = signature * 31L + Float.floatToIntBits(state.getClientSettingScroll());
         signature = signature * 31L + (state.getListeningKeybindSetting() == null ? 0 : state.getListeningKeybindSetting().getName().hashCode());
         for (Setting<?> setting : settings) {

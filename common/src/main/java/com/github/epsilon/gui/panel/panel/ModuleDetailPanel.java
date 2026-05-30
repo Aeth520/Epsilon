@@ -22,6 +22,7 @@ import com.github.epsilon.gui.panel.utils.ScrollBarDragState;
 import com.github.epsilon.gui.panel.utils.ScrollBarUtils;
 import com.github.epsilon.modules.Module;
 import com.github.epsilon.settings.Setting;
+import com.github.epsilon.settings.SettingChangeTracker;
 import com.github.epsilon.settings.impl.KeybindSetting;
 import com.github.epsilon.utils.client.KeybindUtils;
 import com.github.epsilon.utils.render.animation.Animation;
@@ -535,6 +536,7 @@ public class ModuleDetailPanel {
     private long buildContentSignature(Module module, List<Setting<?>> settings) {
         long signature = 17L;
         signature = signature * 31L + TranslateHolder.INSTANCE.getRevision();
+        signature = signature * 31L + SettingChangeTracker.INSTANCE.getRevision();
         signature = signature * 31L + module.getName().hashCode();
         signature = signature * 31L + module.getBindMode().ordinal();
         signature = signature * 31L + module.getKeyBind();

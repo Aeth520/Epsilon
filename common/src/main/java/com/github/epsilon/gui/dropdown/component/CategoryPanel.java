@@ -129,10 +129,19 @@ public class CategoryPanel extends AbstractDropdownPanel {
         String name = module.getName() == null ? "" : module.getName();
         String categoryName = module.getCategory() == null ? "" : module.getCategory().getName();
         String addon = module.getAddonId() == null ? "" : module.getAddonId();
-        return translated.toLowerCase().contains(searchQuery)
-                || name.toLowerCase().contains(searchQuery)
-                || categoryName.toLowerCase().contains(searchQuery)
-                || addon.toLowerCase().contains(searchQuery);
+        String lower = searchQuery.toLowerCase();
+        if (translated.toLowerCase().contains(lower)
+                || name.toLowerCase().contains(lower)
+                || categoryName.toLowerCase().contains(lower)
+                || addon.toLowerCase().contains(lower)) {
+            return true;
+        }
+        for (String alias : module.getAliases()) {
+            if (alias.toLowerCase().contains(lower)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

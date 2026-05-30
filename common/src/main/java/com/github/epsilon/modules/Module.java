@@ -2,6 +2,7 @@ package com.github.epsilon.modules;
 
 import com.github.epsilon.assets.i18n.TranslateComponent;
 import com.github.epsilon.events.bus.EventBus;
+import com.github.epsilon.events.impl.ModuleToggleEvent;
 import com.github.epsilon.modules.impl.hud.notification.NotificationManager;
 import com.github.epsilon.settings.Setting;
 import com.github.epsilon.settings.SettingGroup;
@@ -10,6 +11,7 @@ import net.minecraft.client.Minecraft;
 
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -23,9 +25,12 @@ public class Module {
 
     private int keyBind = -1;
 
+    private final List<String> aliases = new ArrayList<>();
+
     public enum BindMode {
         Toggle,
-        Hold
+        Hold,
+        Smart
     }
 
     private BindMode bindMode = BindMode.Toggle;
@@ -33,6 +38,10 @@ public class Module {
     private boolean hidden = false;
 
     private boolean enabled;
+
+    private long smartBindPressTime = 0;
+
+    public static final long SMART_HOLD_THRESHOLD_MS = 200;
 
     public final List<Setting<?>> settings = new ArrayList<>();
     public final List<SettingGroup> settingGroups = new ArrayList<>();
@@ -85,6 +94,10 @@ public class Module {
 
     public void setEnabled(boolean enabled) {
         if (this.enabled != enabled) {
+            // Prevent enabling modules before the player/world is loaded
+            if (enabled && nullCheck()) {
+                return;
+            }
             this.enabled = enabled;
             if (enabled) {
                 EventBus.INSTANCE.subscribe(this);
@@ -95,7 +108,31 @@ public class Module {
                 NotificationManager.INSTANCE.postModuleNotification(this.getTranslatedName(), false);
                 onDisable();
             }
+            EventBus.INSTANCE.post(new ModuleToggleEvent(this, enabled));
         }
+    }
+
+    public long getSmartBindPressTime() {
+        return smartBindPressTime;
+    }
+
+    public void setSmartBindPressTime(long smartBindPressTime) {
+        this.smartBindPressTime = smartBindPressTime;
+    }
+
+    /**
+     * Adds aliases for module search. Useful when a module is commonly known by different names.
+     */
+    public Module alias(String... aliases) {
+        Collections.addAll(this.aliases, aliases);
+        return this;
+    }
+
+    /**
+     * Returns the list of search aliases for this module.
+     */
+    public List<String> getAliases() {
+        return Collections.unmodifiableList(aliases);
     }
 
     public void reset() {
@@ -180,6 +217,14 @@ public class Module {
         return addSetting(new IntSetting(name, defaultValue, min, max, step, () -> true, false));
     }
 
+    protected IntSetting intSetting(String name, int defaultValue, int min, int max, int step, Setting.Dependency dependency, Consumer<Integer> onChanged) {
+        return addSetting(new IntSetting(name, defaultValue, min, max, step, dependency, false, onChanged));
+    }
+
+    protected IntSetting intSetting(String name, int defaultValue, int min, int max, int step, Consumer<Integer> onChanged) {
+        return addSetting(new IntSetting(name, defaultValue, min, max, step, () -> true, false, onChanged));
+    }
+
     protected BoolSetting boolSetting(String name, boolean defaultValue, Setting.Dependency dependency) {
         return addSetting(new BoolSetting(name, defaultValue, dependency, null));
     }
@@ -208,12 +253,28 @@ public class Module {
         return addSetting(new DoubleSetting(name, defaultValue, min, max, step, () -> true, false));
     }
 
+    protected DoubleSetting doubleSetting(String name, double defaultValue, double min, double max, double step, Setting.Dependency dependency, Consumer<Double> onChanged) {
+        return addSetting(new DoubleSetting(name, defaultValue, min, max, step, dependency, false, onChanged));
+    }
+
+    protected DoubleSetting doubleSetting(String name, double defaultValue, double min, double max, double step, Consumer<Double> onChanged) {
+        return addSetting(new DoubleSetting(name, defaultValue, min, max, step, () -> true, false, onChanged));
+    }
+
     protected StringSetting stringSetting(String name, String defaultValue, Setting.Dependency dependency) {
         return addSetting(new StringSetting(name, defaultValue, dependency));
     }
 
     protected StringSetting stringSetting(String name, String defaultValue) {
         return addSetting(new StringSetting(name, defaultValue, () -> true));
+    }
+
+    protected StringSetting stringSetting(String name, String defaultValue, Setting.Dependency dependency, Consumer<String> onChanged) {
+        return addSetting(new StringSetting(name, defaultValue, dependency, onChanged));
+    }
+
+    protected StringSetting stringSetting(String name, String defaultValue, Consumer<String> onChanged) {
+        return addSetting(new StringSetting(name, defaultValue, () -> true, onChanged));
     }
 
     protected <E extends Enum<E>> EnumSetting<E> enumSetting(String name, E defaultValue, Setting.Dependency dependency, Consumer<E> onChanged) {
@@ -248,12 +309,32 @@ public class Module {
         return addSetting(new ColorSetting(name, defaultValue, true, () -> true));
     }
 
+    protected ColorSetting colorSetting(String name, Color defaultValue, boolean allowAlpha, Setting.Dependency dependency, Consumer<Color> onChanged) {
+        return addSetting(new ColorSetting(name, defaultValue, allowAlpha, dependency, onChanged));
+    }
+
+    protected ColorSetting colorSetting(String name, Color defaultValue, Setting.Dependency dependency, Consumer<Color> onChanged) {
+        return addSetting(new ColorSetting(name, defaultValue, true, dependency, onChanged));
+    }
+
+    protected ColorSetting colorSetting(String name, Color defaultValue, Consumer<Color> onChanged) {
+        return addSetting(new ColorSetting(name, defaultValue, true, () -> true, onChanged));
+    }
+
     protected KeybindSetting keybindSetting(String name, int defaultValue, Setting.Dependency dependency) {
         return addSetting(new KeybindSetting(name, defaultValue, dependency));
     }
 
     protected KeybindSetting keybindSetting(String name, int defaultValue) {
         return addSetting(new KeybindSetting(name, defaultValue, () -> true));
+    }
+
+    protected KeybindSetting keybindSetting(String name, int defaultValue, Setting.Dependency dependency, Consumer<Integer> onChanged) {
+        return addSetting(new KeybindSetting(name, defaultValue, dependency, onChanged));
+    }
+
+    protected KeybindSetting keybindSetting(String name, int defaultValue, Consumer<Integer> onChanged) {
+        return addSetting(new KeybindSetting(name, defaultValue, () -> true, onChanged));
     }
 
     protected ButtonSetting buttonSetting(String name, Runnable func, Setting.Dependency dependency) {

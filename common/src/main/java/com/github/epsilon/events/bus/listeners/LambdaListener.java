@@ -28,6 +28,7 @@ public class LambdaListener implements IListener {
     private final Class<?> target;
     private final boolean isStatic;
     private final int priority;
+    private final Object owner;
     private Consumer<Object> executor;
 
     /**
@@ -42,6 +43,7 @@ public class LambdaListener implements IListener {
         this.target = method.getParameters()[0].getType();
         this.isStatic = Modifier.isStatic(method.getModifiers());
         this.priority = method.getAnnotation(EventHandler.class).priority();
+        this.owner = object;
 
         try {
             String name = method.getName();
@@ -96,6 +98,11 @@ public class LambdaListener implements IListener {
     @Override
     public boolean isStatic() {
         return isStatic;
+    }
+
+    @Override
+    public Object getOwner() {
+        return owner;
     }
 
     static {

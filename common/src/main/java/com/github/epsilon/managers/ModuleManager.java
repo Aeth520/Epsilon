@@ -5,8 +5,10 @@ import com.github.epsilon.assets.i18n.TranslateComponent;
 import com.github.epsilon.events.bus.EventBus;
 import com.github.epsilon.events.bus.EventHandler;
 import com.github.epsilon.events.impl.KeyPressEvent;
+import com.github.epsilon.events.impl.ModuleToggleEvent;
 import com.github.epsilon.events.impl.MousePressEvent;
 import com.github.epsilon.events.impl.Render2DEvent;
+import com.github.epsilon.events.impl.SettingChangedEvent;
 import com.github.epsilon.gui.dropdown.DropdownScreen;
 import com.github.epsilon.gui.hudeditor.HudEditorScreen;
 import com.github.epsilon.gui.panel.PanelScreen;
@@ -15,6 +17,7 @@ import com.github.epsilon.managers.sound.SoundManager;
 import com.github.epsilon.modules.HudModule;
 import com.github.epsilon.modules.Module;
 import com.github.epsilon.modules.impl.ClientSetting;
+import com.github.epsilon.settings.SettingChangeTracker;
 import com.github.epsilon.modules.impl.combat.*;
 import com.github.epsilon.modules.impl.hud.*;
 import com.github.epsilon.modules.impl.hud.notification.NotificationsHUD;
@@ -208,6 +211,16 @@ public class ModuleManager {
                 } else if (isRelease && module.isEnabled()) {
                     affectedModules.add(module);
                 }
+            } else if (module.getBindMode() == Module.BindMode.Smart) {
+                if (isPress) {
+                    if (!module.isEnabled()) {
+                        hasEnabling = true;
+                        module.setSmartBindPressTime(System.currentTimeMillis());
+                        affectedModules.add(module);
+                    }
+                } else if (isRelease && module.isEnabled()) {
+                    affectedModules.add(module);
+                }
             }
         }
 
@@ -219,6 +232,17 @@ public class ModuleManager {
                     module.setEnabled(true);
                 } else if (isRelease && module.isEnabled()) {
                     module.setEnabled(false);
+                }
+            } else if (module.getBindMode() == Module.BindMode.Smart) {
+                if (isPress && !module.isEnabled()) {
+                    module.setEnabled(true);
+                } else if (isRelease && module.isEnabled()) {
+                    long holdDuration = System.currentTimeMillis() - module.getSmartBindPressTime();
+                    if (holdDuration >= Module.SMART_HOLD_THRESHOLD_MS) {
+                        // Long press -> disable (Hold behavior)
+                        module.setEnabled(false);
+                    }
+                    // Short press -> keep enabled (Toggle behavior)
                 }
             }
             if (ClientSetting.INSTANCE.chatNotify.getValue()) {
@@ -233,6 +257,16 @@ public class ModuleManager {
                 SoundManager.INSTANCE.playInUi(SoundKey.DISABLE);
             }
         }
+    }
+
+    @EventHandler
+    private void onSettingChanged(SettingChangedEvent event) {
+        SettingChangeTracker.INSTANCE.increment();
+    }
+
+    @EventHandler
+    private void onModuleToggle(ModuleToggleEvent event) {
+        SettingChangeTracker.INSTANCE.increment();
     }
 
 }

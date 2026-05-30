@@ -2,6 +2,8 @@ package com.github.epsilon.settings.impl;
 
 import com.github.epsilon.assets.i18n.TranslateComponent;
 import com.github.epsilon.settings.Setting;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonPrimitive;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -84,4 +86,17 @@ public class EnumSetting<E extends Enum<E>> extends Setting<E> {
     public E[] getModes() {
         return constants;
     }
+
+    @Override
+    public JsonElement serialize() {
+        return new JsonPrimitive(value.toString());
+    }
+
+    @Override
+    public void deserialize(JsonElement element) {
+        if (element != null && element.isJsonPrimitive()) {
+            setModeSilently(element.getAsString());
+        }
+    }
+
 }
